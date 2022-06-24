@@ -1,1 +1,8 @@
 #!/bin/bash -e
+
+cat << 'EOF'
+---
+default_process_types:
+  web: exec ./bin/graphql-engine serve --server-port=$PORT
+EOF
+
