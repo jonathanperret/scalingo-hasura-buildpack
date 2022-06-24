@@ -25,7 +25,7 @@ HASURA_VERSION=$(cat $ENV_DIR/HASURA_VERSION)
 HASURA_IMAGE=hasura/graphql-engine:${HASURA_VERSION}.cli-migrations-v3
 
 echo "--> Installing udocker"
-curl -L https://github.com/indigo-dc/udocker/releases/download/v1.3.1/udocker-1.3.1.tar.gz | tar "-C$HOME" -zx
+curl -Ss -L https://github.com/indigo-dc/udocker/releases/download/v1.3.1/udocker-1.3.1.tar.gz | tar "-C$HOME" -zx
 
 # Create a wrapper script, notably because there is no plain `python` in the path
 # and udocker's shebang line refers to it.
@@ -62,6 +62,6 @@ echo "--> Installing Hasura CLI"
   # installation, but that tries to connect to a graphql-engine if a config.yaml
   # file is found in the current directory, so move away
   cd /tmp
-  curl -L https://github.com/hasura/graphql-engine/raw/stable/cli/get.sh |
+  curl -Ss -L https://github.com/hasura/graphql-engine/raw/stable/cli/get.sh |
     VERSION=$HASURA_VERSION PATH="$HOME/bin:$PATH" INSTALL_PATH="$HOME/bin" bash
 )
