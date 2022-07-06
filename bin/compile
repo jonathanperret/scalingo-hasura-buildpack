@@ -56,6 +56,25 @@ exec $HOME/bin/udocker run --nobanner --hostenv graphql-engine graphql-engine "$
 EOF
 chmod +x $HOME/bin/graphql-engine
 
+echo "--> Creating start-graphql-engine script"
+cat > $HOME/bin/start-graphql-engine << 'EOF'
+#!/bin/bash
+
+set -e
+
+echo '{ "msg": "Applying connection pool settings..." }'
+
+ruby -ryaml -e '
+  exit unless ENV["HASURA_CONNECTION_POOL_SETTINGS"]
+  d = YAML.load_file(ARGV[0])
+  d.first["configuration"]["connection_info"]["pool_settings"].merge!(YAML.load(ENV["HASURA_CONNECTION_POOL_SETTINGS"]))
+  File.write(ARGV[0], d.to_yaml)
+' -- .udocker/containers/graphql-engine/ROOT/hasura-metadata/databases/databases.yaml
+
+exec 2>&1 $HOME/bin/graphql-engine serve --server-port=$PORT
+EOF
+chmod +x $HOME/bin/start-graphql-engine
+
 echo "--> Installing Hasura CLI"
 (
   # The CLI install scripts launches "hasura version --skip-update-check" to confirm
