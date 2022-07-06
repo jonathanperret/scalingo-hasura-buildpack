@@ -52,7 +52,7 @@ cp -R migrations .udocker/containers/graphql-engine/ROOT/hasura-migrations
 echo "--> Creating graphql-engine wrapper script"
 cat > $HOME/bin/graphql-engine << 'EOF'
 #!/bin/bash
-exec $HOME/bin/udocker run --hostenv graphql-engine graphql-engine "$@"
+exec $HOME/bin/udocker run --nobanner --hostenv graphql-engine graphql-engine "$@"
 EOF
 chmod +x $HOME/bin/graphql-engine
 
