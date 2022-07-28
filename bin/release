@@ -3,6 +3,6 @@
 cat << 'EOF'
 ---
 default_process_types:
-  web: exec ./bin/start-graphql-engine
+  web: exec start-graphql-engine
 EOF
 
