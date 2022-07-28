@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e
+
+exec 2>&1 graphql-engine serve --server-port=$PORT
+

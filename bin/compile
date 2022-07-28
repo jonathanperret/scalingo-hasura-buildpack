@@ -10,17 +10,18 @@ fi
 BUILD_DIR=${1:-}
 CACHE_DIR=${2:-}
 ENV_DIR=${3:-}
-
-# Note that the default profile already adds $HOME/bin to the PATH, it's just
-# not setup while building for some reason.
-PATH=$HOME/bin:$PATH
+RUNTIME_DIR=$(cd $(dirname $0); cd ../runtime; pwd)
 
 if [ ! -f $ENV_DIR/HASURA_VERSION ]; then
   echo "You must set the HASURA_VERSION variable to a version e.g. v2.1.1"
   exit 1
+else
+  HASURA_VERSION=$(cat $ENV_DIR/HASURA_VERSION)
 fi
 
-HASURA_VERSION=$(cat $ENV_DIR/HASURA_VERSION)
+if [[ -f $ENV_DIR/HASURA_CONNECTION_POOL_SETTINGS ]]; then
+  HASURA_CONNECTION_POOL_SETTINGS=$(cat $ENV_DIR/HASURA_CONNECTION_POOL_SETTINGS)
+fi
 
 HASURA_IMAGE=hasura/graphql-engine:${HASURA_VERSION}
 
@@ -48,38 +49,43 @@ cp -R .udocker/containers/graphql-engine/ROOT/bin/graphql-engine $BUILD_DIR/.has
 echo "--> Removing udocker files"
 rm -rf $HOME/.udocker $HOME/udocker
 
-echo "--> Setting up environment in .profile"
-mkdir -p $BUILD_DIR/.profile.d
-cat <<EOF >$BUILD_DIR/.profile.d/001_hasura.sh
-export PATH="\$HOME/.hasura/bin:\$PATH"
-export LD_LIBRARY_PATH="\$HOME/.hasura/lib/x86_64-linux-gnu\${LD_LIBRARY_PATH:+:}\$LD_LIBRARY_PATH"
-EOF
-
-echo "--> Creating start-graphql-engine script"
-cat > $BUILD_DIR/.hasura/bin/start-graphql-engine << 'EOF'
-#!/bin/bash
-
-set -e
-
-echo '{ "msg": "Applying connection pool settings..." }'
+echo "--> Applying connection pool settings from HASURA_CONNECTION_POOL_SETTINGS to metadata"
 
 ruby -ryaml -e '
-  exit unless ENV["HASURA_CONNECTION_POOL_SETTINGS"]
+  exit if ENV["HASURA_CONNECTION_POOL_SETTINGS"].to_s.empty?
   d = YAML.load_file(ARGV[0])
   d.first["configuration"]["connection_info"]["pool_settings"].merge!(YAML.load(ENV["HASURA_CONNECTION_POOL_SETTINGS"]))
   File.write(ARGV[0], d.to_yaml)
-' -- metadata/databases/databases.yaml
+' -- "metadata/databases/databases.yaml"
 
-exec 2>&1 graphql-engine serve --server-port=$PORT
+echo "--> Setting up environment in .profile.d"
+mkdir -p $BUILD_DIR/.profile.d
+cat <<'EOF' >$BUILD_DIR/.profile.d/001_hasura.sh
+export PATH="$HOME/.hasura/bin:$PATH"
+export LD_LIBRARY_PATH="$HOME/.hasura/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:}$LD_LIBRARY_PATH"
+export HASURA_GRAPHQL_SHOW_UPDATE_NOTIFICATION=false
+export HASURA_GRAPHQL_ENABLE_TELEMETRY=false
+export HASURA_GRAPHQL_DISABLE_INTERACTIVE=true
 EOF
-chmod +x $BUILD_DIR/.hasura/bin/start-graphql-engine
 
-echo "--> Installing Hasura CLI"
-(
-  # The CLI install scripts launches "hasura version --skip-update-check" to confirm
-  # installation, but that tries to connect to a graphql-engine if a config.yaml
-  # file is found in the current directory, so move away
-  cd /tmp
-  curl -Ss -L https://github.com/hasura/graphql-engine/raw/stable/cli/get.sh |
-    VERSION=$HASURA_VERSION PATH="$BUILD_DIR/.hasura/bin:$PATH" INSTALL_PATH="$BUILD_DIR/.hasura/bin" bash
-)
+echo "--> Copying start-graphql-engine script"
+cp $RUNTIME_DIR/start-graphql-engine $BUILD_DIR/.hasura/bin/
+
+echo "--> Copying hasura-postdeploy.sh script"
+cp $RUNTIME_DIR/hasura-postdeploy.sh $BUILD_DIR/.hasura/bin/
+
+echo "--> Downloading Hasura CLI"
+curl -Ss -L -o "$BUILD_DIR/.hasura/bin/hasura" https://github.com/hasura/graphql-engine/releases/download/$HASURA_VERSION/cli-hasura-linux-amd64
+chmod +x "$BUILD_DIR/.hasura/bin/hasura"
+
+# If a postdeploy entry appears in the default_process_types as returned
+# by bin/release, it is not taken into account. This is our workaround:
+# generate a default Procfile.
+echo "--> Generating default Procfile if missing"
+
+if [[ ! -f $BUILD_DIR/Procfile ]]; then
+  cat <<'EOF' >$BUILD_DIR/Procfile
+web: exec start-graphql-engine
+postdeploy: hasura-postdeploy.sh
+EOF
+fi

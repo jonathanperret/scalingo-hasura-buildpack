@@ -4,5 +4,6 @@ cat << 'EOF'
 ---
 default_process_types:
   web: exec start-graphql-engine
+  postdeploy: hasura-postdeploy.sh
 EOF
 
