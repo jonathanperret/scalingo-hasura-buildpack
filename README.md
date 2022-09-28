@@ -7,11 +7,14 @@ on [Scalingo](https://scalingo.com).
 ## Usage
 
 * Create a Scalingo application.
-* In the app's environment, set `BUILDPACK_URL=https://github.com/ut7/scalingo-hasura-buildpack`
+* In the app's environment, set `BUILDPACK_URL=https://github.com/jonathanperret/scalingo-hasura-buildpack#<commit-id>`
+  where `<commit-id>` is this repo's latest commit id.
+  * Alternately, create a `.buildpacks` file in your project's root directory
+    containing the URL above.
 
 ### Directories
 
-The buildpack expects the standard Hasura directories at the root of the source:
+The buildpack expects the standard Hasura directories at the root of the repository:
 * `metadata`
 * `migrations`
 * `seeds`
@@ -21,6 +24,23 @@ in a `postdeploy` hook.
 
 The seeds will only be applied if `HASURA_GRAPHQL_SEED_ON_DEPLOY` is set to
 `true` (see below).
+
+### Selecting a Hasura GraphQL version
+
+If the deployed repository has a `.hasura_version` file at the root containing
+a version number, this will be used as the version of the Hasura GraphQL engine
+to deploy. Example:
+
+```bash
+$ echo '2.12.0' > .hasura_version
+$ git add .hasura_version
+$ git commit -m "Set Hasura version"
+```
+
+Alternately, set the `HASURA_VERSION` environment variable to the desired version.
+
+One of `.hasura_version` or `HASURA_VERSION` must be present. If both are
+present, the environment variable will be used.
 
 ### Environment variables
 
@@ -33,8 +53,7 @@ environment variables to be set on your application:
 In addition to the environment variables recognized by Hasura GraphQL engine,
 this buildpack can be controlled using these variables:
 
-* `HASURA_VERSION`: set this to the version of the GraphQL engine you want to
-  deploy, e.g. `v2.8.3`
+* `HASURA_VERSION`: can be used to select an engine version, see above.
 * `HASURA_GRAPHQL_SEED_ON_DEPLOY`: if set to `true`, the postdeploy hook will
   run `hasura seed apply`. If your seed scripts are destructive, you probably
   do not want to run this in production.
