@@ -32,7 +32,7 @@ if [[ -f $ENV_DIR/HASURA_CONNECTION_POOL_SETTINGS ]]; then
   HASURA_CONNECTION_POOL_SETTINGS=$(cat $ENV_DIR/HASURA_CONNECTION_POOL_SETTINGS)
 fi
 
-HASURA_IMAGE=hasura/graphql-engine:v${HASURA_VERSION}
+HASURA_IMAGE=hasura/graphql-engine:v${HASURA_VERSION}.cli-migrations-v3
 
 echo "--> Installing udocker"
 curl -Ss -L https://github.com/indigo-dc/udocker/releases/download/1.3.1/udocker-1.3.1.tar.gz | tar "-C$HOME" -zx
@@ -49,11 +49,14 @@ udocker create --name=graphql-engine $HASURA_IMAGE
 
 echo "--> Copying shared libraries out of container"
 mkdir -p $BUILD_DIR/.hasura/lib
-cp -R .udocker/containers/graphql-engine/ROOT/usr/lib/x86_64-linux-gnu $BUILD_DIR/.hasura/lib
+cp -R $HOME/.udocker/containers/graphql-engine/ROOT/usr/lib/x86_64-linux-gnu $BUILD_DIR/.hasura/lib
 
 echo "--> Copying graphql-engine binary out of container"
 mkdir -p $BUILD_DIR/.hasura/bin
-cp -R .udocker/containers/graphql-engine/ROOT/bin/graphql-engine $BUILD_DIR/.hasura/bin
+cp -R $HOME/.udocker/containers/graphql-engine/ROOT/bin/graphql-engine $BUILD_DIR/.hasura/bin
+
+echo "--> Copying hasura-cli binary out of container"
+cp -R $HOME/.udocker/containers/graphql-engine/ROOT/bin/hasura-cli $BUILD_DIR/.hasura/bin/hasura
 
 echo "--> Removing udocker files"
 rm -rf $HOME/.udocker $HOME/udocker
@@ -82,10 +85,6 @@ cp $RUNTIME_DIR/start-graphql-engine $BUILD_DIR/.hasura/bin/
 
 echo "--> Copying hasura-postdeploy.sh script"
 cp $RUNTIME_DIR/hasura-postdeploy.sh $BUILD_DIR/.hasura/bin/
-
-echo "--> Downloading Hasura CLI"
-curl -Ss -L -o "$BUILD_DIR/.hasura/bin/hasura" https://github.com/hasura/graphql-engine/releases/download/v$HASURA_VERSION/cli-hasura-linux-amd64
-chmod +x "$BUILD_DIR/.hasura/bin/hasura"
 
 # If a postdeploy entry appears in the default_process_types as returned
 # by bin/release, it is not taken into account. This is our workaround:
