@@ -10,14 +10,14 @@ fi
 BUILD_DIR=${1:-}
 CACHE_DIR=${2:-}
 ENV_DIR=${3:-}
-RUNTIME_DIR=$(cd $(dirname $0); cd ../runtime; pwd)
+RUNTIME_DIR=$(cd "$(dirname $0)"; cd ../runtime; pwd)
 
-if [ -f $ENV_DIR/HASURA_VERSION ]; then
-  HASURA_VERSION=$(cat $ENV_DIR/HASURA_VERSION)
+if [ -f "$ENV_DIR/HASURA_VERSION" ]; then
+  HASURA_VERSION=$(cat "$ENV_DIR/HASURA_VERSION")
   echo "--> Found HASURA_VERSION variable, using version: $HASURA_VERSION"
 else
-  if [ -f $BUILD_DIR/.hasura_version ]; then
-    HASURA_VERSION=$(cat $BUILD_DIR/.hasura_version)
+  if [ -f "$BUILD_DIR/.hasura_version" ]; then
+    HASURA_VERSION=$(cat "$BUILD_DIR/.hasura_version")
     echo "--> Found .hasura_version file, using version: $HASURA_VERSION"
   else
     echo "Please select a Hasura version (e.g. v2.12.0) in a .hasura_version file or the HASURA_VERSION variable"
@@ -28,8 +28,8 @@ fi
 # Tolerate, but don't require, a 'v' prefix in the version
 HASURA_VERSION=${HASURA_VERSION#v}
 
-if [[ -f $ENV_DIR/HASURA_CONNECTION_POOL_SETTINGS ]]; then
-  HASURA_CONNECTION_POOL_SETTINGS=$(cat $ENV_DIR/HASURA_CONNECTION_POOL_SETTINGS)
+if [[ -f "$ENV_DIR/HASURA_CONNECTION_POOL_SETTINGS" ]]; then
+  HASURA_CONNECTION_POOL_SETTINGS=$(cat "$ENV_DIR/HASURA_CONNECTION_POOL_SETTINGS")
 fi
 
 HASURA_IMAGE=hasura/graphql-engine:v${HASURA_VERSION}.cli-migrations-v3
@@ -38,28 +38,28 @@ echo "--> Installing udocker"
 curl -Ss -L https://github.com/indigo-dc/udocker/releases/download/1.3.1/udocker-1.3.1.tar.gz | tar "-C$HOME" -zx
 
 function udocker() {
-  python3 $HOME/udocker/udocker "$@"
+  python3 "$HOME/udocker/udocker" "$@"
 }
 
 echo "--> Pulling graphql-engine image $HASURA_IMAGE"
-udocker pull $HASURA_IMAGE
+udocker pull "$HASURA_IMAGE"
 
 echo "--> Creating graphql-engine container"
-udocker create --name=graphql-engine $HASURA_IMAGE
+udocker create --name=graphql-engine "$HASURA_IMAGE"
 
 echo "--> Copying shared libraries out of container"
-mkdir -p $BUILD_DIR/.hasura/lib
-cp -R $HOME/.udocker/containers/graphql-engine/ROOT/usr/lib/x86_64-linux-gnu $BUILD_DIR/.hasura/lib
+mkdir -p "$BUILD_DIR/.hasura/lib"
+cp -R "$HOME/.udocker/containers/graphql-engine/ROOT/usr/lib/x86_64-linux-gnu" "$BUILD_DIR/.hasura/lib"
 
 echo "--> Copying graphql-engine binary out of container"
-mkdir -p $BUILD_DIR/.hasura/bin
-cp -R $HOME/.udocker/containers/graphql-engine/ROOT/bin/graphql-engine $BUILD_DIR/.hasura/bin
+mkdir -p "$BUILD_DIR/.hasura/bin"
+cp -R "$HOME/.udocker/containers/graphql-engine/ROOT/bin/graphql-engine" "$BUILD_DIR/.hasura/bin"
 
 echo "--> Copying hasura-cli binary out of container"
-cp -R $HOME/.udocker/containers/graphql-engine/ROOT/bin/hasura-cli $BUILD_DIR/.hasura/bin/hasura
+cp -R "$HOME/.udocker/containers/graphql-engine/ROOT/bin/hasura-cli" "$BUILD_DIR/.hasura/bin/hasura"
 
 echo "--> Removing udocker files"
-rm -rf $HOME/.udocker $HOME/udocker
+rm -rf "$HOME/.udocker" "$HOME/udocker"
 
 echo "--> Applying connection pool settings from HASURA_CONNECTION_POOL_SETTINGS to metadata"
 
@@ -68,11 +68,11 @@ ruby -ryaml -e '
   d = YAML.load_file(ARGV[0])
   d.first["configuration"]["connection_info"]["pool_settings"].merge!(YAML.load(ENV["HASURA_CONNECTION_POOL_SETTINGS"]))
   File.write(ARGV[0], d.to_yaml)
-' -- "metadata/databases/databases.yaml"
+' -- "$BUILD_DIR/metadata/databases/databases.yaml"
 
 echo "--> Setting up environment in .profile.d"
-mkdir -p $BUILD_DIR/.profile.d
-cat <<'EOF' >$BUILD_DIR/.profile.d/001_hasura.sh
+mkdir -p "$BUILD_DIR/.profile.d"
+cat <<'EOF' >"$BUILD_DIR/.profile.d/001_hasura.sh"
 export PATH="$HOME/.hasura/bin:$PATH"
 export LD_LIBRARY_PATH="$HOME/.hasura/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:}$LD_LIBRARY_PATH"
 export HASURA_GRAPHQL_SHOW_UPDATE_NOTIFICATION=false
@@ -81,18 +81,18 @@ export HASURA_GRAPHQL_DISABLE_INTERACTIVE=true
 EOF
 
 echo "--> Copying start-graphql-engine script"
-cp $RUNTIME_DIR/start-graphql-engine $BUILD_DIR/.hasura/bin/
+cp "$RUNTIME_DIR/start-graphql-engine" "$BUILD_DIR/.hasura/bin/"
 
 echo "--> Copying hasura-postdeploy.sh script"
-cp $RUNTIME_DIR/hasura-postdeploy.sh $BUILD_DIR/.hasura/bin/
+cp "$RUNTIME_DIR/hasura-postdeploy.sh" "$BUILD_DIR/.hasura/bin/"
 
 # If a postdeploy entry appears in the default_process_types as returned
 # by bin/release, it is not taken into account. This is our workaround:
 # generate a default Procfile.
 echo "--> Generating default Procfile if missing"
 
-if [[ ! -f $BUILD_DIR/Procfile ]]; then
-  cat <<'EOF' >$BUILD_DIR/Procfile
+if [[ ! -f "$BUILD_DIR/Procfile" ]]; then
+  cat <<'EOF' >"$BUILD_DIR/Procfile"
 web: exec start-graphql-engine
 postdeploy: hasura-postdeploy.sh
 EOF
